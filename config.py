@@ -2,11 +2,17 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 type StartPositionOption = Literal[
-        "center"
+        "center",
+        "center-at-cursor"
 ]
 
 type ScreenshotActionOption = Literal[
-        "copy-image"
+        "copy-image",
+        "close-window",
+        "resize-left",
+        "resize-right",
+        "resize-up",
+        "resize-down",
 ]
 
 type Key = str
@@ -28,6 +34,14 @@ def default_actions():
         Shortcut(
             action='copy-image',
             press=['s']
+        ),
+        Shortcut(
+            action='close-window',
+            press=['q']
+        ),
+        Shortcut(
+            action='close-window',
+            press=['<Escape>']
         )
     ]
 
@@ -36,7 +50,7 @@ class SnapConfig:
     start_dimentions: tuple[int, int]
     shortcuts: list[Shortcut] = field(default_factory=default_actions)
     window_alpha: float = 0.1
-    start_position: StartPositionOption = "center"
+    start_position: StartPositionOption = "center-at-cursor"
 
     def __post_init__(self):
         if not (0 <= self.window_alpha <= 1):

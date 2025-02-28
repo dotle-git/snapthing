@@ -46,8 +46,16 @@ def open_screenshot_window(config: SnapConfig):
     hs = root.winfo_screenheight() # height of the screen
 
     # calculate x and y coordinates for the Tk root window
-    x = (ws/2) - (w/2)
-    y = (hs/2) - (h/2)
+    if config.start_position == 'center':
+        x = (ws/2) - (w/2)
+        y = (hs/2) - (h/2)
+    elif config.start_position == "center-at-cursor":
+        cursor = pyautogui.position()
+        x = cursor.x - w/2
+        y = cursor.y - h/2
+    else:
+        raise RuntimeError("unexpected start_position config")
+
 
     # set the dimensions of the screen 
     # and where it is placed
@@ -85,24 +93,36 @@ def open_screenshot_window(config: SnapConfig):
 
         root.geometry('%dx%d+%d+%d' % (w, h, posx, posy))
 
+    def resize(dx: int, dy: int):
+        w = root.winfo_width()
+        h = root.winfo_height()
+        y = root.winfo_y()
+        x = root.winfo_x()
+
+        root.geometry('%dx%d+%d+%d' % (w + dx, h + dy, x - 1, y - 28))
+
+
 
     root.bind("<ButtonPress-1>", onpress)
     root.bind("<ButtonRelease-1>", onrelease)
     root.bind("<B1-Motion>", onmove)
 
-
-    root.bind("<Escape>", exit_window)
-    root.bind("q", exit_window)
+    magnitude = 15
+    actions = {
+        'copy-image': lambda _: screenshot_and_copy_image(root),
+        'close-window': exit_window,
+        "resize-right": lambda _: resize(magnitude, 0),
+        "resize-left": lambda _: resize(-magnitude, 0),
+        "resize-down": lambda _: resize(0, magnitude),
+        "resize-up": lambda _: resize(0, -magnitude),
+    }
 
     for shortcut in config.shortcuts:
         # TODO: support more than one input key
         assert len(shortcut.press) == 1
         assert len(shortcut.hold) == 0
 
-        action = None
-        if shortcut.action == "copy-image":
-            action = lambda _: screenshot_and_copy_image(root)
-
+        action = actions[shortcut.action]
         assert action is not None
         root.bind(shortcut.press[0], action)
 
@@ -111,11 +131,17 @@ def open_screenshot_window(config: SnapConfig):
 
     
 open_screenshot_window(SnapConfig(
-    start_dimentions = (500, 300),
+    start_dimentions = (800, 600),
     window_alpha = 0.1,
-    start_position = "center",
+    start_position = "center-at-cursor",
     shortcuts=[
         Shortcut(press=["s"], action="copy-image"),
         Shortcut(press=["<Return>"], action="copy-image"),
+        Shortcut(press=["<Escape>"], action="close-window"),
+        Shortcut(press=["q"], action="close-window"),
+        Shortcut(press=["H"], action="resize-left"),
+        Shortcut(press=["L"], action="resize-right"),
+        Shortcut(press=["J"], action="resize-down"),
+        Shortcut(press=["K"], action="resize-up"),
     ]
 ))
