@@ -33,6 +33,17 @@ def copy_image(ctx):
     print('Copied image to clipboard.')
     ctx.window.destroy()
 
+@action
+def copy_ocr(ctx: ActionContext):
+    image = screenshot(ctx.window)
+    output = BytesIO()
+    image.save(output, format="PNG")
+    _ = output.seek(0)
+    text = platform.extract_image_text_ocr(output)
+    platform.copy_text_to_clipboard(text)
+    print(text)
+    ctx.window.destroy()
+
 
 @onaction('exit')
 def exit_window(ctx: ActionContext):
@@ -217,5 +228,6 @@ open_screenshot_window(SnapConfig(
         ("translate-up", Keys.UP),
         ("next-window-size", Keys.TAB),
         ("prev-window-size", Keys.SHIFT_TAB),
+        ("copy-ocr", press('c'))
     ]
 ))
