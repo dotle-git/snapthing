@@ -13,6 +13,10 @@ type ScreenshotActionOption = Literal[
         "resize-right",
         "resize-up",
         "resize-down",
+        "translate-left",
+        "translate-right",
+        "translate-up",
+        "translate-down",
 ]
 
 type Key = str
@@ -51,6 +55,8 @@ class SnapConfig:
     shortcuts: list[Shortcut] = field(default_factory=default_actions)
     window_alpha: float = 0.1
     start_position: StartPositionOption = "center-at-cursor"
+    resize_increment: int = 20
+    translate_increment: int = 20
 
     def __post_init__(self):
         if not (0 <= self.window_alpha <= 1):

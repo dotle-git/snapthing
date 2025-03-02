@@ -33,6 +33,24 @@ def screenshot_and_copy_image(root: tk.Tk):
     root.destroy()
 
 
+def resize(root, dx: int, dy: int):
+    w = root.winfo_width()
+    h = root.winfo_height()
+    y = root.winfo_y()
+    x = root.winfo_x()
+
+    root.geometry('%dx%d+%d+%d' % (w + dx, h + dy, x - 1, y - 28))
+
+
+def translate(root: tk.Tk, dx: int, dy: int):
+    w = root.winfo_width()
+    h = root.winfo_height()
+    y = root.winfo_y()
+    x = root.winfo_x()
+
+    root.geometry('%dx%d+%d+%d' % (w, h, x + dx - 1, y + dy - 28))
+
+
 def open_screenshot_window(config: SnapConfig):
     root = tk.Tk()
     _ = root.attributes('-topmost', True)  # Keep the window on top
@@ -93,28 +111,23 @@ def open_screenshot_window(config: SnapConfig):
 
         root.geometry('%dx%d+%d+%d' % (w, h, posx, posy))
 
-    def resize(dx: int, dy: int):
-        w = root.winfo_width()
-        h = root.winfo_height()
-        y = root.winfo_y()
-        x = root.winfo_x()
-
-        root.geometry('%dx%d+%d+%d' % (w + dx, h + dy, x - 1, y - 28))
-
-
-
     root.bind("<ButtonPress-1>", onpress)
     root.bind("<ButtonRelease-1>", onrelease)
     root.bind("<B1-Motion>", onmove)
 
-    magnitude = 15
+    magnitude = config.resize_increment
+    step = config.translate_increment
     actions = {
         'copy-image': lambda _: screenshot_and_copy_image(root),
         'close-window': exit_window,
-        "resize-right": lambda _: resize(magnitude, 0),
-        "resize-left": lambda _: resize(-magnitude, 0),
-        "resize-down": lambda _: resize(0, magnitude),
-        "resize-up": lambda _: resize(0, -magnitude),
+        "resize-right": lambda _: resize(root, magnitude, 0),
+        "resize-left": lambda _: resize(root, -magnitude, 0),
+        "resize-down": lambda _: resize(root, 0, magnitude),
+        "resize-up": lambda _: resize(root, 0, -magnitude),
+        "translate-right": lambda _: translate(root, step, 0),
+        "translate-left": lambda _: translate(root, -step, 0),
+        "translate-down": lambda _: translate(root, 0, step),
+        "translate-up": lambda _: translate(root, 0, -step),
     }
 
     for shortcut in config.shortcuts:
@@ -132,7 +145,7 @@ def open_screenshot_window(config: SnapConfig):
     
 open_screenshot_window(SnapConfig(
     start_dimentions = (800, 600),
-    window_alpha = 0.1,
+    window_alpha = 0.2,
     start_position = "center-at-cursor",
     shortcuts=[
         Shortcut(press=["s"], action="copy-image"),
@@ -143,5 +156,9 @@ open_screenshot_window(SnapConfig(
         Shortcut(press=["L"], action="resize-right"),
         Shortcut(press=["J"], action="resize-down"),
         Shortcut(press=["K"], action="resize-up"),
+        Shortcut(press=["h"], action="translate-left"),
+        Shortcut(press=["l"], action="translate-right"),
+        Shortcut(press=["j"], action="translate-down"),
+        Shortcut(press=["k"], action="translate-up"),
     ]
 ))
