@@ -1,10 +1,10 @@
 from collections import defaultdict
 import tkinter as tk
 from typing import Callable
-from config import ScreenshotActionOption, SnapConfig
+from .config import ScreenshotActionOption, SnapConfig
 from dataclasses import dataclass
-from platforms import Platform
-from keys import KeyPress
+from .platforms import Platform
+from .keys import KeyPress
 
 
 @dataclass
@@ -38,6 +38,10 @@ class App:
         self._bindings = defaultdict(set)
         self.window.bind('<Key>', self._handle_key)
 
+        for _action, trigger in self.config.shortcuts:
+            self.assign(_action, trigger)
+
+
     def assign(
         self, 
         action: str, 
@@ -46,7 +50,6 @@ class App:
         self._bindings[key].add(action)
 
     def _handle_key(self, event: tk.Event):
-        print(event)
         for key, actions in self._bindings.items():
             if event.keycode != key.keycode and event.keysym != key.key:
                 continue

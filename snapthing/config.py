@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Literal
-from keys import KeyPress, press, Keys
+from .keys import KeyPress, press, Keys
 
 type StartPositionOption = Literal[
         "center",
@@ -40,6 +40,7 @@ def default_quickchange_sizes():
         (1000, 100),
         (1920, 1080),
     ]
+
 
 @dataclass
 class SnapConfig:
