@@ -1,22 +1,15 @@
 import tkinter as tk
-from turtle import window_width
-from PIL.Image import Image
 import pyautogui
 from io import BytesIO
-from config import Shortcut, SnapConfig
+from collections import deque
+from config import SnapConfig
+from keys import press, Keys, shift
 from platforms import LinuxXClip
+from eventhandling import ActionContext, onaction, App, action
+
+
 platform = LinuxXClip()
 platform.assert_dependencies()
-
-def copy_image(image: Image):
-    # TODO: play the clipboard noise
-    # TODO: support other formats -- png, webp, etc.
-    output = BytesIO()
-    image.save(output, format="PNG")
-    _ = output.seek(0)
-    platform.copy_image_to_clipboard(output)
-    print('Copied image to clipboard.')
-
 
 def screenshot(root: tk.Tk):
     w = root.winfo_width()
@@ -28,9 +21,22 @@ def screenshot(root: tk.Tk):
     return pyautogui.screenshot(region=(x, y, w, h))
 
 
-def screenshot_and_copy_image(root: tk.Tk):
-    copy_image(screenshot(root))
-    root.destroy()
+@action
+def copy_image(ctx):
+    image = screenshot(ctx.window)
+    # TODO: play the clipboard noise
+    # TODO: support other formats -- png, webp, etc.
+    output = BytesIO()
+    image.save(output, format="PNG")
+    _ = output.seek(0)
+    platform.copy_image_to_clipboard(output)
+    print('Copied image to clipboard.')
+    ctx.window.destroy()
+
+
+@onaction('exit')
+def exit_window(ctx: ActionContext):
+    ctx.window.destroy()
 
 
 def resize(root, dx: int, dy: int):
@@ -41,6 +47,49 @@ def resize(root, dx: int, dy: int):
 
     root.geometry('%dx%d+%d+%d' % (w + dx, h + dy, x - 1, y - 28))
 
+@onaction("resize-left")
+def resize_left(ctx: ActionContext):
+    resize(ctx.window, -ctx.config.resize_increment, 0)
+
+@onaction("resize-right")
+def resize_right(ctx: ActionContext):
+    resize(ctx.window, ctx.config.resize_increment, 0)
+
+@onaction("resize-down")
+def resize_right(ctx: ActionContext):
+    resize(ctx.window, 0, ctx.config.resize_increment)
+
+@onaction("resize-up")
+def resize_right(ctx: ActionContext):
+    resize(ctx.window, 0, -ctx.config.resize_increment)
+
+def resize_absolute(root, w, h):
+    y = root.winfo_y()
+    x = root.winfo_x()
+    root.geometry('%dx%d+%d+%d' % (w, h, x - 1, y - 28))
+
+
+def configure_window_size_quickswitch(config: SnapConfig, root: tk.Tk):
+    sizes = deque(config.quick_change_dimensions)
+
+    def next_window_size(_):
+        sizes.rotate(1)
+        w, h = sizes[0]
+        resize_absolute(root, w, h)
+
+    def prev_window_size(_):
+        sizes.rotate(-1)
+        w, h = sizes[0]
+        resize_absolute(root, w, h)
+
+    def default_window_size(_):
+        w, h = config.start_dimentions
+        resize_absolute(root, w, h)
+
+    action(next_window_size)
+    action(prev_window_size)
+    action(default_window_size)
+
 
 def translate(root: tk.Tk, dx: int, dy: int):
     w = root.winfo_width()
@@ -49,6 +98,22 @@ def translate(root: tk.Tk, dx: int, dy: int):
     x = root.winfo_x()
 
     root.geometry('%dx%d+%d+%d' % (w, h, x + dx - 1, y + dy - 28))
+
+@action
+def translate_right(ctx: ActionContext):
+    translate(ctx.window, ctx.config.translate_increment, 0)
+
+@action
+def translate_left(ctx: ActionContext):
+    translate(ctx.window, -ctx.config.translate_increment, 0)
+
+@action
+def translate_down(ctx: ActionContext):
+    translate(ctx.window, 0, ctx.config.translate_increment)
+
+@action
+def translate_up(ctx: ActionContext):
+    translate(ctx.window, 0, -ctx.config.translate_increment)
 
 
 def open_screenshot_window(config: SnapConfig):
@@ -84,9 +149,6 @@ def open_screenshot_window(config: SnapConfig):
 
     startx, starty, endx, endy = (0, 0, 0, 0)
     
-    def exit_window(_):
-        root.destroy()
-
     def onpress(e):
         nonlocal startx, starty
         startx, starty = (e.x, e.y)
@@ -104,8 +166,7 @@ def open_screenshot_window(config: SnapConfig):
         # absolute co-ordinates of mouse on the screen
         absx = x + e.x
         absy = y + e.y
-
-        # position is set to the top left corner, so we need to adjust by the window size to center
+# position is set to the top left corner, so we need to adjust by the window size to center
         posx = absx - startx
         posy = absy - starty
 
@@ -115,50 +176,46 @@ def open_screenshot_window(config: SnapConfig):
     root.bind("<ButtonRelease-1>", onrelease)
     root.bind("<B1-Motion>", onmove)
 
-    magnitude = config.resize_increment
-    step = config.translate_increment
-    actions = {
-        'copy-image': lambda _: screenshot_and_copy_image(root),
-        'close-window': exit_window,
-        "resize-right": lambda _: resize(root, magnitude, 0),
-        "resize-left": lambda _: resize(root, -magnitude, 0),
-        "resize-down": lambda _: resize(root, 0, magnitude),
-        "resize-up": lambda _: resize(root, 0, -magnitude),
-        "translate-right": lambda _: translate(root, step, 0),
-        "translate-left": lambda _: translate(root, -step, 0),
-        "translate-down": lambda _: translate(root, 0, step),
-        "translate-up": lambda _: translate(root, 0, -step),
-    }
+    configure_window_size_quickswitch(config, root)
 
-    for shortcut in config.shortcuts:
-        # TODO: support more than one input key
-        assert len(shortcut.press) == 1
-        assert len(shortcut.hold) == 0
+    app = App(
+        config=config,
+        platform=LinuxXClip(),
+        window=root
+    )
 
-        action = actions[shortcut.action]
-        assert action is not None
-        root.bind(shortcut.press[0], action)
+    for _action, trigger in config.shortcuts:
+        app.assign(_action, trigger)
 
     root.mainloop()
-
 
     
 open_screenshot_window(SnapConfig(
     start_dimentions = (800, 600),
-    window_alpha = 0.2,
+    window_alpha = 0.3,
     start_position = "center-at-cursor",
     shortcuts=[
-        Shortcut(press=["s"], action="copy-image"),
-        Shortcut(press=["<Return>"], action="copy-image"),
-        Shortcut(press=["<Escape>"], action="close-window"),
-        Shortcut(press=["q"], action="close-window"),
-        Shortcut(press=["H"], action="resize-left"),
-        Shortcut(press=["L"], action="resize-right"),
-        Shortcut(press=["J"], action="resize-down"),
-        Shortcut(press=["K"], action="resize-up"),
-        Shortcut(press=["h"], action="translate-left"),
-        Shortcut(press=["l"], action="translate-right"),
-        Shortcut(press=["j"], action="translate-down"),
-        Shortcut(press=["k"], action="translate-up"),
+        ("copy-image", press('s')),
+        ("copy-image", Keys.ENTER),
+        ("exit", Keys.ESCAPE),
+        ("exit", press('q')),
+        ("resize-left", shift('H')),
+        ("resize-right", shift('L')),
+        ("resize-down", shift('J')),
+        ("resize-up", shift('K')),
+        ("resize-left", Keys.SHIFT_LEFT),
+        ("resize-right", Keys.SHIFT_RIGHT),
+        ("resize-down", Keys.SHIFT_DOWN),
+        ("resize-up", Keys.SHIFT_UP),
+        ("translate-left", press('h')),
+        ("translate-right", press('l')),
+        ("translate-down", press('j')),
+        ("translate-up", press('k')),
+        ("translate-left", Keys.LEFT),
+        ("translate-right", Keys.RIGHT),
+        ("translate-down", Keys.DOWN),
+        ("translate-up", Keys.UP),
+        ("next-window-size", Keys.TAB),
+        ("prev-window-size", Keys.SHIFT_TAB),
     ]
 ))
